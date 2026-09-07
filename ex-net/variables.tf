@@ -34,6 +34,37 @@ variable "admin_cidr_blocks" {
   default     = []
 }
 
+variable "instance_count" {
+  description = "생성할 EC2 인스턴스 수"
+  type        = number
+  default     = 1
+}
+
+variable "instance_type" {
+  description = "EC2 인스턴스 타입"
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "ami_id" {
+  description = "EC2에 사용할 AMI ID"
+  type        = string
+  default     = "ami-0aa2bfca464a9be6b"
+}
+
+variable "user_data" {
+  description = "EC2 시작 시 실행할 user data"
+  type        = string
+  default     = <<-EOT
+    #!/bin/bash
+    dnf update -y
+    dnf install -y nginx
+    systemctl enable nginx
+    systemctl start nginx
+    echo "std15-ex-net instance" > /usr/share/nginx/html/index.html
+  EOT
+}
+
 variable "tags" {
   description = "모든 리소스에 공통으로 적용할 태그"
   type        = map(string)

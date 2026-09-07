@@ -24,5 +24,16 @@ output "security_group_ids" {
     ssh          = aws_security_group.ssh.id
     external_alb = aws_security_group.external_alb.id
     internal_alb = aws_security_group.internal_alb.id
+    instance     = aws_security_group.instance.id
   }
+}
+
+output "instance_ids" {
+  description = "생성된 EC2 인스턴스 ID 목록"
+  value       = aws_instance.std15_instance[*].id
+}
+
+output "instance_public_ips" {
+  description = "생성된 EC2 인스턴스 public IP 목록"
+  value       = aws_instance.std15_instance[*].public_ip
 }

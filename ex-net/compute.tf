@@ -5,14 +5,19 @@ resource "aws_instance" "std15_instance" {
   key_name      = var.key_name
   subnet_id     = aws_subnet.public[count.index % length(aws_subnet.public)].id
 
-  vpc_security_group_ids = [aws_security_group.instance.id, aws_security_group.ssh.id, aws_security_group.external_alb.id, aws_security_group.internal_alb.id]
+  vpc_security_group_ids = [aws_security_group.instance.id]
   user_data              = <<-EOF
     #!/bin/bash
-    apt update -y
-    apt install -y nginx:3.13.3-alpine
+    if command -v dnf >/dev/null 2>&1; then
+      dnf install -y nginx
+    elif command -v apt-get >/dev/null 2>&1; then
+      apt-get update -y
+      DEBIAN_FRONTEND=noninteractive apt-get install -y nginx
+    fi
     systemctl enable nginx
     systemctl start nginx
-    echo"<h1>std15-ex-net instance</h1>" > /usr/www/html/index.html
+    mkdir -p /usr/share/nginx/html
+    echo "<h1>std15-ex-net instance</h1>" > /usr/share/nginx/html/index.html
     EOF
   root_block_device {
     volume_size = 20
@@ -29,5 +34,6 @@ resource "aws_instance" "std15_instance" {
 }
 
 output "instance_public_id" {
-  value = aws_instance.std15_instance[*].public_ip
+  description = "생성된 EC2 인스턴스의 public IP 목록"
+  value       = aws_instance.std15_instance[*].public_ip
 }

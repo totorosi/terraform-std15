@@ -255,6 +255,18 @@ resource "aws_network_acl" "public" {
     to_port    = 65535
   }
 
+  dynamic "ingress" {
+    for_each = var.admin_cidr_blocks
+    content {
+      rule_no    = 130 + tonumber(ingress.key)
+      protocol   = "tcp"
+      action     = "allow"
+      cidr_block = ingress.value
+      from_port  = 22
+      to_port    = 22
+    }
+  }
+
   egress {
     rule_no    = 100
     protocol   = "-1"

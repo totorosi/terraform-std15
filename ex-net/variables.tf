@@ -52,6 +52,12 @@ variable "ami_id" {
   default     = "ami-0aa2bfca464a9be6b"
 }
 
+variable "key_name" {
+  description = "AWS에 등록된 EC2 Key Pair 이름"
+  type        = string
+  default     = "std15"
+}
+
 variable "user_data" {
   description = "EC2 시작 시 실행할 user data"
   type        = string

@@ -5,7 +5,7 @@ resource "aws_instance" "std15_instance" {
   key_name      = var.key_name
   subnet_id     = aws_subnet.public[count.index % length(aws_subnet.public)].id
 
-  vpc_security_group_ids      = [aws_security_group.instance.id]
+  vpc_security_group_ids      = [aws_security_group.instance.id, aws_security_group.ssh.id]
   user_data                   = <<-EOF
     #!/bin/bash
     if command -v dnf >/dev/null 2>&1; then

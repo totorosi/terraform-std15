@@ -2,10 +2,6 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
-locals {
-  azs = length(var.availability_zones) > 0 ? var.availability_zones : slice(data.aws_availability_zones.available.names, 0, 3)
-}
-
 resource "aws_vpc" "std15_lab_vpc" {
   cidr_block           = var.vpc_cidr
   instance_tenancy     = "default"
@@ -112,7 +108,7 @@ resource "aws_route_table_association" "private" {
 }
 
 resource "aws_security_group" "ssh" {
-  name        = "${var.name}-ssh-sg"
+  name        = "std15-ex-net-ssh-sg"
   description = "SSH access for administration"
   vpc_id      = aws_vpc.std15_lab_vpc.id
 

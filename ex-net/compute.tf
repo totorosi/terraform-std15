@@ -47,3 +47,25 @@ output "instance_public_id" {
   description = "생성된 EC2 인스턴스의 public IP 목록"
   value       = aws_instance.std15_instance[*].public_ip
 }
+
+resource "aws_instance" "st15_ami_instance" {
+  ami           = var.ami_id
+  instance_type = "t3.micro"
+  subnet_id     = aws_subnet.public[0].id
+  key_name      = var.key_name
+
+  vpc_security_group_ids = [aws_security_group.instance.id, aws_security_group.ssh.id]
+  user_data              = <<-EOF
+    #!/bin/bash
+    systemctl enable nginx
+    systemctl start nginx
+    EOF
+
+  volume_tags = {
+    Name = "std15-ami-instance-volume"
+  }
+
+  tags = {
+    Name = "std15-ami-instance"
+  }
+}

@@ -1,0 +1,22 @@
+# 이 파일을 terraform.tfvars 로 복사해서 값을 채우세요.
+# terraform.tfvars 는 .gitignore 로 제외되고, 이 example 파일만 커밋됩니다.
+#   cp terraform.tfvars.example terraform.tfvars
+
+# SSH 를 허용할 IP. 비워 두면 22번 포트가 아예 열리지 않습니다.
+admin_cidr_blocks = ["203.0.113.10/32"]
+
+# 필요할 때만 주석을 해제해서 기본값을 덮어씁니다.
+# region               = "sa-east-1"
+# name                 = "std15-ex-net"
+# vpc_cidr             = "10.10.0.0/16"
+# availability_zones   = ["sa-east-1a", "sa-east-1b", "sa-east-1c"]
+# instance_count       = 1
+# instance_type        = "t3.micro"
+# ami_id               = "ami-0aa2bfca464a9be6b"
+# key_name             = "std15"
+# asg_min_size         = 1
+# asg_max_size         = 3
+# asg_desired_capacity = 2
+# db_name              = "std15mysqldb"
+# db_username          = "std15"
+# db_port              = 3306

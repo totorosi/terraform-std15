@@ -1,114 +1,12 @@
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
-resource "aws_vpc" "std15_lab_vpc" {
-  cidr_block           = var.vpc_cidr
-  instance_tenancy     = "default"
-  enable_dns_support   = true
-  enable_dns_hostnames = true
-
-  tags = merge(var.tags, {
-    Name = "${var.name}-vpc"
-  })
-}
-
-resource "aws_subnet" "public" {
-  count = length(local.azs)
-
-  vpc_id                  = aws_vpc.std15_lab_vpc.id
-  cidr_block              = var.public_subnet_cidrs[count.index]
-  availability_zone       = local.azs[count.index]
-  map_public_ip_on_launch = true
-
-  tags = merge(var.tags, {
-    Name = "${var.name}-public-${local.azs[count.index]}"
-    Tier = "public"
-  })
-}
-
-resource "aws_subnet" "private" {
-  count = length(local.azs)
-
-  vpc_id            = aws_vpc.std15_lab_vpc.id
-  cidr_block        = var.private_subnet_cidrs[count.index]
-  availability_zone = local.azs[count.index]
-
-  tags = merge(var.tags, {
-    Name = "${var.name}-private-${local.azs[count.index]}"
-    Tier = "private"
-  })
-}
-
-resource "aws_internet_gateway" "std15_igw" {
-  vpc_id = aws_vpc.std15_lab_vpc.id
-
-  tags = merge(var.tags, {
-    Name = "${var.name}-igw"
-  })
-}
-
-resource "aws_eip" "nat" {
-  domain = "vpc"
-
-  tags = merge(var.tags, {
-    Name = "${var.name}-nat-eip"
-  })
-}
-
-resource "aws_nat_gateway" "std15_nat_gateway" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public[0].id
-  depends_on    = [aws_internet_gateway.std15_igw]
-
-  tags = merge(var.tags, {
-    Name = "${var.name}-nat-gateway"
-  })
-}
-
-resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.std15_lab_vpc.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.std15_igw.id
-  }
-
-  tags = merge(var.tags, {
-    Name = "${var.name}-public-rt"
-  })
-}
-
-resource "aws_route_table_association" "public" {
-  count = length(local.azs)
-
-  subnet_id      = aws_subnet.public[count.index].id
-  route_table_id = aws_route_table.public.id
-}
-
-resource "aws_route_table" "private" {
-  count  = length(local.azs)
-  vpc_id = aws_vpc.std15_lab_vpc.id
-
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.std15_nat_gateway.id
-  }
-
-  tags = merge(var.tags, {
-    Name = "${var.name}-private-${local.azs[count.index]}-rt"
-  })
-}
-
-resource "aws_route_table_association" "private" {
-  count = length(local.azs)
-
-  subnet_id      = aws_subnet.private[count.index].id
-  route_table_id = aws_route_table.private[count.index].id
-}
-
+#
+# Security Group
+#
+# 하나의 Security Group 안에서 inline 규칙(ingress/egress)과
+# aws_security_group_rule 을 섞으면 서로 상태를 덮어쓰므로,
+# 이 파일에서는 inline 규칙만 사용한다.
+#
 resource "aws_security_group" "ssh" {
-  name        = "std15-ex-net-ssh-sg"
+  name        = "${var.name}-ssh-sg"
   description = "SSH access for administration"
   vpc_id      = aws_vpc.std15_lab_vpc.id
 
@@ -166,6 +64,22 @@ resource "aws_security_group" "internal_alb" {
   description = "Private HTTP access from the external ALB"
   vpc_id      = aws_vpc.std15_lab_vpc.id
 
+  # 기존 aws_security_group_rule.internal_alb_http 을 inline 으로 옮겼다.
+  ingress {
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.external_alb.id]
+  }
+
+  # VPC 내부 클라이언트(EC2)가 internal ALB 를 호출할 수 있도록 추가했다.
+  ingress {
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.instance.id]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -212,15 +126,35 @@ resource "aws_security_group" "instance" {
   })
 }
 
-resource "aws_security_group_rule" "internal_alb_http" {
-  type                     = "ingress"
-  from_port                = 80
-  to_port                  = 80
-  protocol                 = "tcp"
-  source_security_group_id = aws_security_group.external_alb.id
-  security_group_id        = aws_security_group.internal_alb.id
+# RDS 전용 Security Group.
+# 기존에는 MySQL 이 instance-sg(22/80만 허용)를 쓰고 있어서 3306 이 막혀 있었다.
+resource "aws_security_group" "mysql" {
+  name        = "${var.name}-mysql-sg"
+  description = "MySQL access from the EC2 instances"
+  vpc_id      = aws_vpc.std15_lab_vpc.id
+
+  ingress {
+    from_port       = var.db_port
+    to_port         = var.db_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.instance.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(var.tags, {
+    Name = "${var.name}-mysql-sg"
+  })
 }
 
+#
+# Network ACL (public subnet)
+#
 resource "aws_network_acl" "public" {
   vpc_id = aws_vpc.std15_lab_vpc.id
 
@@ -242,6 +176,7 @@ resource "aws_network_acl" "public" {
     to_port    = 443
   }
 
+  # ephemeral port (응답 트래픽용)
   ingress {
     rule_no    = 120
     protocol   = "tcp"

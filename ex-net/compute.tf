@@ -6,27 +6,7 @@ resource "aws_instance" "std15_instance" {
   subnet_id     = aws_subnet.public[count.index % length(aws_subnet.public)].id
 
   vpc_security_group_ids      = [aws_security_group.instance.id, aws_security_group.ssh.id]
-  user_data                   = <<-EOF
-    #!/bin/bash
-    if command -v dnf >/dev/null 2>&1; then
-      dnf install -y nginx
-    elif command -v apt-get >/dev/null 2>&1; then
-      apt-get update -y
-      DEBIAN_FRONTEND=noninteractive apt-get install -y nginx
-    fi
-    systemctl enable nginx
-    systemctl start nginx
-    if command -v dnf >/dev/null 2>&1; then
-      web_root=/usr/share/nginx/html
-    else
-      web_root=/var/www/html
-    fi
-    mkdir -p "$web_root"
-    cat > "$web_root/index.html" <<'HTML'
-    <h1>std15-ex-net instance</h1>
-    <p>configured-by-terraform</p>
-    HTML
-    EOF
+  user_data                   = local.user_data
   user_data_replace_on_change = true
 
   root_block_device {
@@ -43,29 +23,30 @@ resource "aws_instance" "std15_instance" {
   })
 }
 
-output "instance_public_id" {
-  description = "생성된 EC2 인스턴스의 public IP 목록"
-  value       = aws_instance.std15_instance[*].public_ip
+# 리소스 이름 오타(st15 -> std15)를 고치면서 기존 state 를 그대로 이어받는다.
+# apply 후에는 이 moved 블록을 삭제해도 된다.
+moved {
+  from = aws_instance.st15_ami_instance
+  to   = aws_instance.std15_ami_instance
 }
 
-resource "aws_instance" "st15_ami_instance" {
+# AMI 를 굽기 위한 베이스 인스턴스
+resource "aws_instance" "std15_ami_instance" {
   ami           = var.ami_id
-  instance_type = "t3.micro"
+  instance_type = var.instance_type
   subnet_id     = aws_subnet.public[0].id
   key_name      = var.key_name
 
   vpc_security_group_ids = [aws_security_group.instance.id, aws_security_group.ssh.id]
-  user_data              = <<-EOF
-    #!/bin/bash
-    systemctl enable nginx
-    systemctl start nginx
-    EOF
+  # 기존 스크립트는 nginx 설치 없이 systemctl start 만 했기 때문에 실패했다.
+  user_data = local.user_data
 
-  volume_tags = {
-    Name = "std15-ami-instance-volume"
-  }
+  volume_tags = merge(var.tags, {
+    Name = "${var.name}-ami-instance-volume"
+  })
 
-  tags = {
-    Name = "std15-ami-instance"
-  }
+  tags = merge(var.tags, {
+    Name = "${var.name}-ami-instance"
+    Tier = "public"
+  })
 }

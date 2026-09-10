@@ -1,0 +1,4 @@
+# 셸 스크립트는 반드시 LF 로 체크아웃되어야 한다.
+# core.autocrlf=true 환경에서 CRLF 로 바뀌면 shebang(#!/bin/bash\r)이 깨져서
+# EC2 user_data 부트스트랩이 실패한다.
+*.sh text eol=lf
